@@ -6,6 +6,7 @@ import edu.cwru.sepia.environment.model.state.ResourceNode;
 import edu.cwru.sepia.environment.model.state.State;
 import edu.cwru.sepia.environment.model.state.Unit;
 import edu.cwru.sepia.util.Direction;
+import edu.cwru.sepia.util.DistanceMetrics;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,12 +14,21 @@ import java.util.*;
 
 public class AstarAgent extends Agent {
 
-    class MapLocation {
+    class MapLocation implements Comparable<MapLocation> {
         public int x, y;
+        public MapLocation cameFrom;
+        public float cost;
 
         public MapLocation(int x, int y, MapLocation cameFrom, float cost) {
             this.x = x;
             this.y = y;
+            this.cameFrom = cameFrom;
+            this.cost = cost;
+        }
+
+        @Override
+        public int compareTo(MapLocation o) {
+            return (int)(this.cost - o.cost);
         }
     }
 
@@ -197,7 +207,7 @@ public class AstarAgent extends Agent {
      * @return
      */
     private boolean shouldReplanPath(State.StateView state, History.HistoryView history, Stack<MapLocation> currentPath) {
-        return false;
+        return true;
     }
 
     /**
@@ -279,31 +289,34 @@ public class AstarAgent extends Agent {
      * @return Stack of positions with top of stack being first move in plan
      */
     private Stack<MapLocation> AstarSearch(MapLocation start, final MapLocation goal, int xExtent, int yExtent, MapLocation enemyFootmanLoc, Set<MapLocation> resourceLocations) {
-        // return an empty path
+
         Set<MapLocation> closedSet = new HashSet<MapLocation>();
+
         PriorityQueue<MapLocation> minHeap = new PriorityQueue<MapLocation>(xExtent * yExtent, new Comparator<MapLocation>() {
             @Override
             public int compare(MapLocation o1, MapLocation o2) {
-                return (int)(heuristicCostEstimate(o1, goal) - heuristicCostEstimate(o2, goal));
+                return heuristicCostEstimate(o1, goal) - heuristicCostEstimate(o2, goal);
             }
         });
-        Set<MapLocation> openSet = new HashSet<MapLocation>();
-        openSet.add(start);
+
+        //Set<MapLocation> openSet = new HashSet<MapLocation>();
+        //openSet.add(start);
 
         Map<MapLocation, MapLocation> came_from = new HashMap<MapLocation, MapLocation>();
         Map<MapLocation, Integer> g_score = new HashMap<MapLocation, Integer>();
-        g_score.put(start, 0);
+        Map<MapLocation, Integer> f_score = new HashMap<MapLocation, Integer>();  // heuristic costs of locations
 
-        Map<MapLocation, Float> f_score = new HashMap<MapLocation, Float>();
+        minHeap.offer(start);
+        g_score.put(start, 0);
         f_score.put(start, heuristicCostEstimate(start, goal));
 
-        while (!openSet.isEmpty()) {
+        while (!minHeap.isEmpty()) {
             MapLocation current = minHeap.poll();
             if (current == goal) {
                 return reconstructPath(came_from, goal);
             }
             closedSet.add(current);
-            for (MapLocation neighbor : neighborsOf(current)) {
+            for (MapLocation neighbor : neighborsOf(current, xExtent, yExtent)) {
                 if (closedSet.contains(neighbor)) {
                     continue;
                 }
@@ -322,20 +335,77 @@ public class AstarAgent extends Agent {
         return new Stack<MapLocation>();
     }
 
-    private float heuristicCostEstimate(MapLocation from, MapLocation to) {
-        return 1.0f;
+    private int heuristicCostEstimate(MapLocation from, MapLocation to) {
+        /*int xDist = to.x - from.x;
+        int yDist = to.y - from.y;
+        return Math.max(Math.abs(xDist), Math.abs(yDist));*/
+        return DistanceMetrics.chebyshevDistance(from.x, from.y, to.x, to.y);
     }
 
-    private Stack<MapLocation> reconstructPath (Map cameFrom, MapLocation current) {
-        return new Stack<MapLocation>();
+    private Stack<MapLocation> reconstructPath (Map<MapLocation, MapLocation> predecessors, MapLocation current) {
+        Stack<MapLocation> stack = new Stack<MapLocation>();
+        stack.add(current);
+        while (predecessors.containsKey(current)) {
+            current = predecessors.get(current);
+            stack.add(current);
+        }
+        return stack;
     }
 
-    private Set<MapLocation> neighborsOf(MapLocation location) {
-        return new HashSet<MapLocation>();
+    private Set<MapLocation> neighborsOf(MapLocation location, int xExtent, int yExtent) {
+        HashSet<MapLocation> neighbors = new HashSet<MapLocation>();
+
+        // top neighbor
+        if (validLocation(location.x, location.y + 1, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x, location.y + 1, location, 0));
+        }
+
+        // bottom neighbor
+        if (validLocation(location.x, location.y - 1, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x, location.y - 1, location, 0));
+        }
+
+        // left neighbor
+        if (validLocation(location.x - 1, location.y, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x - 1, location.y, location, 0));
+        }
+
+        // right neighbor
+        if (validLocation(location.x + 1, location.y, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x + 1, location.y, location, 0));
+        }
+
+        // top left neighbor
+        if (validLocation(location.x - 1, location.y + 1, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x - 1, location.y + 1, location, 0));
+        }
+
+        // top right neighbor
+        if (validLocation(location.x + 1, location.y + 1, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x + 1, location.y + 1, location, 0));
+        }
+
+        // bottom left neighbor
+        if (validLocation(location.x - 1, location.y - 1, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x - 1, location.y - 1, location, 0));
+        }
+
+        // bottom right neighbor
+        if (validLocation(location.x + 1, location.y - 1, xExtent, yExtent)) {
+            neighbors.add(new MapLocation(location.x + 1, location.y - 1, location, 0));
+        }
+
+        return neighbors;
+    }
+
+    private boolean validLocation(int neighborX, int neighborY, int xExtent, int yExtent) {
+        return xExtent > neighborX && neighborX >= 0 && yExtent > neighborY && neighborY >= 0;
     }
 
     private int distanceBetween(MapLocation a, MapLocation b) {
-        return 0;
+        int xDist = b.x - a.x;
+        int yDist = b.y - a.y;
+        return Math.max(Math.abs(xDist), Math.abs(yDist));
     }
 
     /**
@@ -350,38 +420,14 @@ public class AstarAgent extends Agent {
     private Direction getNextDirection(int xDiff, int yDiff) {
 
         // figure out the direction the footman needs to move in
-        if(xDiff == 1 && yDiff == 1)
-        {
-            return Direction.SOUTHEAST;
-        }
-        else if(xDiff == 1 && yDiff == 0)
-        {
-            return Direction.EAST;
-        }
-        else if(xDiff == 1 && yDiff == -1)
-        {
-            return Direction.NORTHEAST;
-        }
-        else if(xDiff == 0 && yDiff == 1)
-        {
-            return Direction.SOUTH;
-        }
-        else if(xDiff == 0 && yDiff == -1)
-        {
-            return Direction.NORTH;
-        }
-        else if(xDiff == -1 && yDiff == 1)
-        {
-            return Direction.SOUTHWEST;
-        }
-        else if(xDiff == -1 && yDiff == 0)
-        {
-            return Direction.WEST;
-        }
-        else if(xDiff == -1 && yDiff == -1)
-        {
-            return Direction.NORTHWEST;
-        }
+        if(xDiff == 1 && yDiff == 1) {return Direction.SOUTHEAST;}
+        else if(xDiff == 1 && yDiff == 0) {return Direction.EAST;}
+        else if(xDiff == 1 && yDiff == -1) {return Direction.NORTHEAST;}
+        else if(xDiff == 0 && yDiff == 1) {return Direction.SOUTH;}
+        else if(xDiff == 0 && yDiff == -1) {return Direction.NORTH;}
+        else if(xDiff == -1 && yDiff == 1) {return Direction.SOUTHWEST;}
+        else if(xDiff == -1 && yDiff == 0) {return Direction.WEST;}
+        else if(xDiff == -1 && yDiff == -1) {return Direction.NORTHWEST;}
 
         System.err.println("Invalid path. Could not determine direction");
         return null;
