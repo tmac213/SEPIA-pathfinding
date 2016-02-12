@@ -30,6 +30,11 @@ public class AstarAgent extends Agent {
         public int compareTo(MapLocation o) {
             return (int)(this.cost - o.cost);
         }
+
+        @Override
+        public boolean equals(Object location) {
+            return this.x == ((MapLocation)location).x && this.y == ((MapLocation)location).y;
+        }
     }
 
     Stack<MapLocation> path;
@@ -207,7 +212,7 @@ public class AstarAgent extends Agent {
      * @return
      */
     private boolean shouldReplanPath(State.StateView state, History.HistoryView history, Stack<MapLocation> currentPath) {
-        return true;
+        return false;
     }
 
     /**
@@ -303,16 +308,17 @@ public class AstarAgent extends Agent {
         //openSet.add(start);
 
         Map<MapLocation, MapLocation> came_from = new HashMap<MapLocation, MapLocation>();
-        Map<MapLocation, Integer> g_score = new HashMap<MapLocation, Integer>();
-        Map<MapLocation, Integer> f_score = new HashMap<MapLocation, Integer>();  // heuristic costs of locations
+        Map<MapLocation, Integer> gScoreMap = initializedToInfinityMap(xExtent, yExtent);
+        Map<MapLocation, Integer> fScoreMap = initializedToInfinityMap(xExtent, yExtent);  // heuristic costs of locations
 
         minHeap.offer(start);
-        g_score.put(start, 0);
-        f_score.put(start, heuristicCostEstimate(start, goal));
+        gScoreMap.put(start, 0);
+        fScoreMap.put(start, heuristicCostEstimate(start, goal));
 
         while (!minHeap.isEmpty()) {
             MapLocation current = minHeap.poll();
-            if (current == goal) {
+            System.out.println("current location is " + current);
+            if (current.equals(goal)) {
                 return reconstructPath(came_from, goal);
             }
             closedSet.add(current);
@@ -320,19 +326,31 @@ public class AstarAgent extends Agent {
                 if (closedSet.contains(neighbor)) {
                     continue;
                 }
-                int tentativeGScore = g_score.get(current) + distanceBetween(current, neighbor);
+                int tentativeGScore = gScoreMap.get(current) + distanceBetween(current, neighbor);
                 if (!minHeap.contains(neighbor)) {
                     minHeap.offer(neighbor);
-                } else if (tentativeGScore >= g_score.get(neighbor)) {
+                } else if (tentativeGScore >= gScoreMap.get(neighbor)) {
                     continue;
                 }
                 came_from.put(neighbor, current);
-                g_score.put(neighbor, tentativeGScore);
-                f_score.put(neighbor, g_score.get(neighbor) + heuristicCostEstimate(neighbor, goal));
+                gScoreMap.put(neighbor, tentativeGScore);
+                fScoreMap.put(neighbor, gScoreMap.get(neighbor) + heuristicCostEstimate(neighbor, goal));
             }
         }
 
         return new Stack<MapLocation>();
+    }
+
+    private HashMap<MapLocation, Integer> initializedToInfinityMap(int xExtent, int yExtent) {
+        HashMap<MapLocation, Integer> map = new HashMap<MapLocation, Integer>(xExtent * yExtent);
+
+        for (int i = 0; i < xExtent; ++i) {
+            for (int j = 0; j < yExtent; ++i) {
+                map.put(new MapLocation(i, j, null, 0), Integer.MAX_VALUE);
+            }
+        }
+
+        return map;
     }
 
     private int heuristicCostEstimate(MapLocation from, MapLocation to) {
@@ -405,7 +423,7 @@ public class AstarAgent extends Agent {
     private int distanceBetween(MapLocation a, MapLocation b) {
         int xDist = b.x - a.x;
         int yDist = b.y - a.y;
-        return Math.max(Math.abs(xDist), Math.abs(yDist));
+        return xDist + yDist;
     }
 
     /**
