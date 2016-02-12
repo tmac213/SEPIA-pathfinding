@@ -295,6 +295,8 @@ public class AstarAgent extends Agent {
      */
     private Stack<MapLocation> AstarSearch(MapLocation start, final MapLocation goal, int xExtent, int yExtent, MapLocation enemyFootmanLoc, Set<MapLocation> resourceLocations) {
 
+        System.out.println("search start");
+
         Set<MapLocation> closedSet = new HashSet<MapLocation>();
 
         PriorityQueue<MapLocation> minHeap = new PriorityQueue<MapLocation>(xExtent * yExtent, new Comparator<MapLocation>() {
@@ -307,17 +309,24 @@ public class AstarAgent extends Agent {
         //Set<MapLocation> openSet = new HashSet<MapLocation>();
         //openSet.add(start);
 
+        System.out.println("creating score maps");
+
         Map<MapLocation, MapLocation> came_from = new HashMap<MapLocation, MapLocation>();
-        Map<MapLocation, Integer> gScoreMap = initializedToInfinityMap(xExtent, yExtent);
-        Map<MapLocation, Integer> fScoreMap = initializedToInfinityMap(xExtent, yExtent);  // heuristic costs of locations
+        Map<MapLocation, Integer> gScoreMap = new HashMap<MapLocation, Integer>();
+        Map<MapLocation, Integer> fScoreMap = new HashMap<MapLocation, Integer>();  // heuristic costs of locations
+
+        //Map<MapLocation, Integer> gScoreMap = initializedToInfinityMap(xExtent, yExtent);
+        //Map<MapLocation, Integer> fScoreMap = initializedToInfinityMap(xExtent, yExtent);  // heuristic costs of locations
 
         minHeap.offer(start);
         gScoreMap.put(start, 0);
         fScoreMap.put(start, heuristicCostEstimate(start, goal));
 
+        System.out.println("entering loop");
+
         while (!minHeap.isEmpty()) {
             MapLocation current = minHeap.poll();
-            System.out.println("current location is " + current);
+            System.out.println(String.format("current location is (%d, %d)", current.x, current.y));
             if (current.equals(goal)) {
                 return reconstructPath(came_from, goal);
             }
@@ -326,27 +335,37 @@ public class AstarAgent extends Agent {
                 if (closedSet.contains(neighbor)) {
                     continue;
                 }
-                int tentativeGScore = gScoreMap.get(current) + distanceBetween(current, neighbor);
+                int tentativeGScore = getScoreFrom(gScoreMap, current) + distanceBetween(current, neighbor);
                 if (!minHeap.contains(neighbor)) {
                     minHeap.offer(neighbor);
-                } else if (tentativeGScore >= gScoreMap.get(neighbor)) {
+                } else if (tentativeGScore >= getScoreFrom(gScoreMap, neighbor)) {
                     continue;
                 }
+                System.out.println(String.format("(%d, %d) came from (%d, %d)", neighbor.x, neighbor.y, current.x, current.y));
                 came_from.put(neighbor, current);
                 gScoreMap.put(neighbor, tentativeGScore);
-                fScoreMap.put(neighbor, gScoreMap.get(neighbor) + heuristicCostEstimate(neighbor, goal));
+                fScoreMap.put(neighbor, getScoreFrom(gScoreMap, neighbor) + heuristicCostEstimate(neighbor, goal));
             }
         }
 
+        System.out.println("search end");
+
         return new Stack<MapLocation>();
+    }
+
+    private Integer getScoreFrom(Map<MapLocation, Integer> map, MapLocation location) {
+        Integer x;
+        return (x = map.get(location)) == null ? Integer.MAX_VALUE : x;
     }
 
     private HashMap<MapLocation, Integer> initializedToInfinityMap(int xExtent, int yExtent) {
         HashMap<MapLocation, Integer> map = new HashMap<MapLocation, Integer>(xExtent * yExtent);
 
+        System.out.println(String.format("initializing %dx%d map", xExtent, yExtent));
+
         for (int i = 0; i < xExtent; ++i) {
             for (int j = 0; j < yExtent; ++i) {
-                map.put(new MapLocation(i, j, null, 0), Integer.MAX_VALUE);
+                map.put(new MapLocation(i, j, null, 0), (int)Double.POSITIVE_INFINITY);
             }
         }
 
@@ -362,11 +381,19 @@ public class AstarAgent extends Agent {
 
     private Stack<MapLocation> reconstructPath (Map<MapLocation, MapLocation> predecessors, MapLocation current) {
         Stack<MapLocation> stack = new Stack<MapLocation>();
-        stack.add(current);
+        stack.add(0, current);
         while (predecessors.containsKey(current)) {
             current = predecessors.get(current);
-            stack.add(current);
+            stack.add(0, current);
         }
+
+        System.out.println("returning path");
+        for (MapLocation x : stack) {
+            System.out.println(String.format("(%d, %d)", x.x, x.y));
+            System.out.println(stack.size());
+            System.out.println(predecessors.get(x));
+        }
+
         return stack;
     }
 
