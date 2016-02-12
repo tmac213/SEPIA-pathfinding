@@ -218,6 +218,28 @@ public class AstarAgent extends Agent {
      * @return
      */
     private boolean shouldReplanPath(State.StateView state, History.HistoryView history, Stack<MapLocation> currentPath) {
+        if (enemyFootmanID != -1) {  // if there is an enemy footman
+            Unit.UnitView enemyFootmanUnit = state.getUnit(enemyFootmanID);
+            MapLocation enemyLocation = new MapLocation(enemyFootmanUnit.getXPosition(), enemyFootmanUnit.getYPosition(), null, 0);
+            return enemyBlockingPath(enemyLocation, currentPath);
+        }
+        return false;  // else we don't have to replan
+    }
+
+    private boolean enemyBlockingPath(MapLocation enemyLocation, Stack<MapLocation> currentPath) {
+        if (!currentPath.isEmpty()) {
+            MapLocation nextLocation = currentPath.peek();
+
+            int enemyToNextLocation = distanceBetween(enemyLocation, nextLocation);
+
+            if (currentPath.size() > 2) {
+                MapLocation subsequentLocation = currentPath.get(currentPath.size() - 2);
+                int enemyToSubsequentLocation = distanceBetween(enemyLocation, subsequentLocation);
+
+                return enemyToNextLocation <= 1 || enemyToSubsequentLocation <= 1;
+            }
+            return enemyToNextLocation <= 1;
+        }
         return false;
     }
 
@@ -340,10 +362,9 @@ public class AstarAgent extends Agent {
                 Stack<MapLocation> path = reconstructPath(came_from, goal);
                 path.remove(start);
                 return path;
-                //return reconstructPath(came_from, goal);
             }
             closedSet.add(current);
-            for (MapLocation neighbor : neighborsOf(current, xExtent, yExtent, resourceLocations)) {
+            for (MapLocation neighbor : neighborsOf(current, xExtent, yExtent, enemyFootmanLoc, resourceLocations)) {
                 if (closedSet.contains(neighbor)) {
                     continue;
                 }
@@ -353,35 +374,20 @@ public class AstarAgent extends Agent {
                 } else if (tentativeGScore >= getScoreFrom(gScoreMap, neighbor)) {
                     continue;
                 }
-                System.out.println(String.format("(%d, %d) came from (%d, %d)", neighbor.x, neighbor.y, current.x, current.y));
                 came_from.put(neighbor, current);
                 gScoreMap.put(neighbor, tentativeGScore);
                 fScoreMap.put(neighbor, getScoreFrom(gScoreMap, neighbor) + heuristicCostEstimate(neighbor, goal));
             }
         }
 
-        System.out.println("search failed");
-
+        System.out.println("No available path.");
+        System.exit(0);
         return new Stack<MapLocation>();
     }
 
     private Integer getScoreFrom(Map<MapLocation, Integer> map, MapLocation location) {
         Integer x;
         return (x = map.get(location)) == null ? Integer.MAX_VALUE : x;
-    }
-
-    private HashMap<MapLocation, Integer> initializedToInfinityMap(int xExtent, int yExtent) {
-        HashMap<MapLocation, Integer> map = new HashMap<MapLocation, Integer>(xExtent * yExtent);
-
-        System.out.println(String.format("initializing %dx%d map", xExtent, yExtent));
-
-        for (int i = 0; i < xExtent; ++i) {
-            for (int j = 0; j < yExtent; ++i) {
-                map.put(new MapLocation(i, j, null, 0), (int)Double.POSITIVE_INFINITY);
-            }
-        }
-
-        return map;
     }
 
     private int heuristicCostEstimate(MapLocation from, MapLocation to) {
@@ -409,54 +415,56 @@ public class AstarAgent extends Agent {
         return stack;
     }
 
-    private Set<MapLocation> neighborsOf(MapLocation location, int xExtent, int yExtent, Set<MapLocation> resourceLocations) {
+    private Set<MapLocation> neighborsOf(MapLocation location, int xExtent, int yExtent, MapLocation enemyFootmanLocation, Set<MapLocation> resourceLocations) {
         HashSet<MapLocation> neighbors = new HashSet<MapLocation>();
 
         // top neighbor
-        if (validLocation(location.x, location.y + 1, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x, location.y + 1, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x, location.y + 1, location, 0));
         }
 
         // bottom neighbor
-        if (validLocation(location.x, location.y - 1, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x, location.y - 1, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x, location.y - 1, location, 0));
         }
 
         // left neighbor
-        if (validLocation(location.x - 1, location.y, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x - 1, location.y, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x - 1, location.y, location, 0));
         }
 
         // right neighbor
-        if (validLocation(location.x + 1, location.y, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x + 1, location.y, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x + 1, location.y, location, 0));
         }
 
         // top left neighbor
-        if (validLocation(location.x - 1, location.y + 1, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x - 1, location.y + 1, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x - 1, location.y + 1, location, 0));
         }
 
         // top right neighbor
-        if (validLocation(location.x + 1, location.y + 1, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x + 1, location.y + 1, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x + 1, location.y + 1, location, 0));
         }
 
         // bottom left neighbor
-        if (validLocation(location.x - 1, location.y - 1, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x - 1, location.y - 1, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x - 1, location.y - 1, location, 0));
         }
 
         // bottom right neighbor
-        if (validLocation(location.x + 1, location.y - 1, xExtent, yExtent, resourceLocations)) {
+        if (validLocation(location.x + 1, location.y - 1, xExtent, yExtent, enemyFootmanLocation, resourceLocations)) {
             neighbors.add(new MapLocation(location.x + 1, location.y - 1, location, 0));
         }
 
         return neighbors;
     }
 
-    private boolean validLocation(int neighborX, int neighborY, int xExtent, int yExtent, Set<MapLocation> resourceLocations) {
-        return !resourceLocations.contains(new MapLocation(neighborX, neighborY, null, 0)) && xExtent > neighborX && neighborX >= 0 && yExtent > neighborY && neighborY >= 0;
+    private boolean validLocation(int neighborX, int neighborY, int xExtent, int yExtent, MapLocation enemyFootmanLocation, Set<MapLocation> resourceLocations) {
+        MapLocation locationBeingValidated = new MapLocation(neighborX, neighborY, null, 0);
+
+        return !locationBeingValidated.equals(enemyFootmanLocation) && !resourceLocations.contains(locationBeingValidated) && xExtent > neighborX && neighborX >= 0 && yExtent > neighborY && neighborY >= 0;
     }
 
     private int distanceBetween(MapLocation a, MapLocation b) {
