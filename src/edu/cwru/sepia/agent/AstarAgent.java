@@ -15,7 +15,7 @@ import java.util.*;
 
 public class AstarAgent extends Agent {
 
-    class MapLocation implements Comparable<MapLocation> {
+    class MapLocation {
         public int x, y;
         public MapLocation cameFrom;
         public float cost;
@@ -28,18 +28,13 @@ public class AstarAgent extends Agent {
         }
 
         @Override
-        public int compareTo(MapLocation o) {
-            return (int)(this.cost - o.cost);
-        }
-
-        @Override
         public boolean equals(Object location) {
             return this.x == ((MapLocation)location).x && this.y == ((MapLocation)location).y;
         }
 
         @Override
         public int hashCode() {
-            return new Pair<Integer, Integer>(this.x, this.y).hashCode();
+            return new Pair<>(this.x, this.y).hashCode();
         }
     }
 
@@ -223,7 +218,7 @@ public class AstarAgent extends Agent {
             MapLocation enemyLocation = new MapLocation(enemyFootmanUnit.getXPosition(), enemyFootmanUnit.getYPosition(), null, 0);
             return enemyBlockingPath(enemyLocation, currentPath);
         }
-        return false;  // else we don't have to replan
+        return false;  // else we don't have to re-plan
     }
 
     private boolean enemyBlockingPath(MapLocation enemyLocation, Stack<MapLocation> currentPath) {
@@ -323,8 +318,6 @@ public class AstarAgent extends Agent {
      */
     private Stack<MapLocation> AstarSearch(MapLocation start, final MapLocation goal, int xExtent, int yExtent, MapLocation enemyFootmanLoc, Set<MapLocation> resourceLocations) {
 
-        System.out.println("search start");
-
         Set<MapLocation> closedSet = new HashSet<MapLocation>();
 
         PriorityQueue<MapLocation> minHeap = new PriorityQueue<MapLocation>(xExtent * yExtent, new Comparator<MapLocation>() {
@@ -334,30 +327,14 @@ public class AstarAgent extends Agent {
             }
         });
 
-        //Set<MapLocation> openSet = new HashSet<MapLocation>();
-        //openSet.add(start);
-
-        System.out.println("creating score maps");
-
         Map<MapLocation, MapLocation> came_from = new HashMap<MapLocation, MapLocation>();
-        Map<MapLocation, Integer> gScoreMap = new HashMap<MapLocation, Integer>();
-        Map<MapLocation, Integer> fScoreMap = new HashMap<MapLocation, Integer>();  // heuristic costs of locations
-
-        //Map<MapLocation, Integer> gScoreMap = initializedToInfinityMap(xExtent, yExtent);
-        //Map<MapLocation, Integer> fScoreMap = initializedToInfinityMap(xExtent, yExtent);  // heuristic costs of locations
+        Map<MapLocation, Integer> gScoreMap = new HashMap<MapLocation, Integer>();  //
 
         minHeap.offer(start);
         gScoreMap.put(start, 0);
-        fScoreMap.put(start, heuristicCostEstimate(start, goal));
-
-        System.out.println("entering loop");
 
         while (!minHeap.isEmpty()) {
             MapLocation current = minHeap.poll();
-            if (current != start) {
-                System.out.println(String.format("current location is (%d, %d) which came from (%d, %d)", current.x, current.y,
-                        came_from.get(current).x, came_from.get(current).y));
-            }
             if (current.equals(goal)) {
                 Stack<MapLocation> path = reconstructPath(came_from, goal);
                 path.remove(start);
@@ -376,17 +353,17 @@ public class AstarAgent extends Agent {
                 }
                 came_from.put(neighbor, current);
                 gScoreMap.put(neighbor, tentativeGScore);
-                fScoreMap.put(neighbor, getScoreFrom(gScoreMap, neighbor) + heuristicCostEstimate(neighbor, goal));
             }
         }
 
         System.out.println("No available path.");
         System.exit(0);
-        return new Stack<MapLocation>();
+        return new Stack<>();
     }
 
     private Integer getScoreFrom(Map<MapLocation, Integer> map, MapLocation location) {
         Integer x;
+        // if location not in map return sentinel value
         return (x = map.get(location)) == null ? Integer.MAX_VALUE : x;
     }
 
@@ -400,16 +377,9 @@ public class AstarAgent extends Agent {
     private Stack<MapLocation> reconstructPath(Map<MapLocation, MapLocation> cameFrom, MapLocation current) {
         Stack<MapLocation> stack = new Stack<MapLocation>();
 
-        System.out.println(String.format("current is (%d, %d)", current.x, current.y));
-
         while (cameFrom.get(current) != null) {
             current = cameFrom.get(current);
             stack.add(current);
-        }
-
-        System.out.println("returning path");
-        for (MapLocation x : stack) {
-            System.out.println(String.format("(%d, %d)", x.x, x.y));
         }
 
         return stack;
