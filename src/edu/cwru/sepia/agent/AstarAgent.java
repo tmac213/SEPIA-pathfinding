@@ -7,6 +7,7 @@ import edu.cwru.sepia.environment.model.state.State;
 import edu.cwru.sepia.environment.model.state.Unit;
 import edu.cwru.sepia.util.Direction;
 import edu.cwru.sepia.util.DistanceMetrics;
+import edu.cwru.sepia.util.Pair;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,6 +35,11 @@ public class AstarAgent extends Agent {
         @Override
         public boolean equals(Object location) {
             return this.x == ((MapLocation)location).x && this.y == ((MapLocation)location).y;
+        }
+
+        @Override
+        public int hashCode() {
+            return new Pair<Integer, Integer>(this.x, this.y).hashCode();
         }
     }
 
@@ -326,12 +332,18 @@ public class AstarAgent extends Agent {
 
         while (!minHeap.isEmpty()) {
             MapLocation current = minHeap.poll();
-            System.out.println(String.format("current location is (%d, %d)", current.x, current.y));
+            if (current != start) {
+                System.out.println(String.format("current location is (%d, %d) which came from (%d, %d)", current.x, current.y,
+                        came_from.get(current).x, came_from.get(current).y));
+            }
             if (current.equals(goal)) {
-                return reconstructPath(came_from, goal);
+                Stack<MapLocation> path = reconstructPath(came_from, goal);
+                path.remove(start);
+                return path;
+                //return reconstructPath(came_from, goal);
             }
             closedSet.add(current);
-            for (MapLocation neighbor : neighborsOf(current, xExtent, yExtent)) {
+            for (MapLocation neighbor : neighborsOf(current, xExtent, yExtent, resourceLocations)) {
                 if (closedSet.contains(neighbor)) {
                     continue;
                 }
@@ -348,7 +360,7 @@ public class AstarAgent extends Agent {
             }
         }
 
-        System.out.println("search end");
+        System.out.println("search failed");
 
         return new Stack<MapLocation>();
     }
@@ -379,72 +391,72 @@ public class AstarAgent extends Agent {
         return DistanceMetrics.chebyshevDistance(from.x, from.y, to.x, to.y);
     }
 
-    private Stack<MapLocation> reconstructPath (Map<MapLocation, MapLocation> predecessors, MapLocation current) {
+    private Stack<MapLocation> reconstructPath(Map<MapLocation, MapLocation> cameFrom, MapLocation current) {
         Stack<MapLocation> stack = new Stack<MapLocation>();
-        stack.add(0, current);
-        while (predecessors.containsKey(current)) {
-            current = predecessors.get(current);
-            stack.add(0, current);
+
+        System.out.println(String.format("current is (%d, %d)", current.x, current.y));
+
+        while (cameFrom.get(current) != null) {
+            current = cameFrom.get(current);
+            stack.add(current);
         }
 
         System.out.println("returning path");
         for (MapLocation x : stack) {
             System.out.println(String.format("(%d, %d)", x.x, x.y));
-            System.out.println(stack.size());
-            System.out.println(predecessors.get(x));
         }
 
         return stack;
     }
 
-    private Set<MapLocation> neighborsOf(MapLocation location, int xExtent, int yExtent) {
+    private Set<MapLocation> neighborsOf(MapLocation location, int xExtent, int yExtent, Set<MapLocation> resourceLocations) {
         HashSet<MapLocation> neighbors = new HashSet<MapLocation>();
 
         // top neighbor
-        if (validLocation(location.x, location.y + 1, xExtent, yExtent)) {
+        if (validLocation(location.x, location.y + 1, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x, location.y + 1, location, 0));
         }
 
         // bottom neighbor
-        if (validLocation(location.x, location.y - 1, xExtent, yExtent)) {
+        if (validLocation(location.x, location.y - 1, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x, location.y - 1, location, 0));
         }
 
         // left neighbor
-        if (validLocation(location.x - 1, location.y, xExtent, yExtent)) {
+        if (validLocation(location.x - 1, location.y, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x - 1, location.y, location, 0));
         }
 
         // right neighbor
-        if (validLocation(location.x + 1, location.y, xExtent, yExtent)) {
+        if (validLocation(location.x + 1, location.y, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x + 1, location.y, location, 0));
         }
 
         // top left neighbor
-        if (validLocation(location.x - 1, location.y + 1, xExtent, yExtent)) {
+        if (validLocation(location.x - 1, location.y + 1, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x - 1, location.y + 1, location, 0));
         }
 
         // top right neighbor
-        if (validLocation(location.x + 1, location.y + 1, xExtent, yExtent)) {
+        if (validLocation(location.x + 1, location.y + 1, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x + 1, location.y + 1, location, 0));
         }
 
         // bottom left neighbor
-        if (validLocation(location.x - 1, location.y - 1, xExtent, yExtent)) {
+        if (validLocation(location.x - 1, location.y - 1, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x - 1, location.y - 1, location, 0));
         }
 
         // bottom right neighbor
-        if (validLocation(location.x + 1, location.y - 1, xExtent, yExtent)) {
+        if (validLocation(location.x + 1, location.y - 1, xExtent, yExtent, resourceLocations)) {
             neighbors.add(new MapLocation(location.x + 1, location.y - 1, location, 0));
         }
 
         return neighbors;
     }
 
-    private boolean validLocation(int neighborX, int neighborY, int xExtent, int yExtent) {
-        return xExtent > neighborX && neighborX >= 0 && yExtent > neighborY && neighborY >= 0;
+    private boolean validLocation(int neighborX, int neighborY, int xExtent, int yExtent, Set<MapLocation> resourceLocations) {
+        return !resourceLocations.contains(new MapLocation(neighborX, neighborY, null, 0)) && xExtent > neighborX && neighborX >= 0 && yExtent > neighborY && neighborY >= 0;
     }
 
     private int distanceBetween(MapLocation a, MapLocation b) {
